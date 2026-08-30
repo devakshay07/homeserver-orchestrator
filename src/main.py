@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 from config.settings import settings
-from logging.setup import setup_logging
-from queue.sqlite_queue import SQLiteQueue
-from queue.worker import TaskWorker
-from queue.models import Task, TaskStatus
+from app_logging.setup import setup_logging
+from task_queue.sqlite_queue import SQLiteQueue
+from task_queue.worker import TaskWorker
+from task_queue.models import Task, TaskStatus
 from telegram.bot import build_app
 from scheduler.cron_manager import cron_manager
 
@@ -24,6 +24,12 @@ from orchestrator import Orchestrator
 orchestrator = Orchestrator(db_queue, notifier)
 
 worker = TaskWorker(db_queue, orchestrator.process_task)
+
+# Inject dependencies into telegram bot context
+tg_app.bot_data['db_queue'] = db_queue
+tg_app.bot_data['notifier'] = notifier
+tg_app.bot_data['worker'] = worker
+tg_app.bot_data['cron_manager'] = cron_manager
 
 async def shutdown(sig: signal.Signals | None = None) -> None:
     if sig:
@@ -75,9 +81,7 @@ async def main() -> None:
         await asyncio.sleep(3600)
 
 if __name__ == "__main__":
-    # Ensure data directory exists
     Path("data").mkdir(exist_ok=True)
-    
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

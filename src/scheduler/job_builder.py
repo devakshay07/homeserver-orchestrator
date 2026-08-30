@@ -1,7 +1,7 @@
 import structlog
 from .cron_manager import cron_manager
-from queue.sqlite_queue import SQLiteQueue
-from queue.models import TaskStatus
+from task_queue.sqlite_queue import SQLiteQueue
+from task_queue.models import TaskStatus
 
 logger = structlog.get_logger("app")
 db_queue = SQLiteQueue()

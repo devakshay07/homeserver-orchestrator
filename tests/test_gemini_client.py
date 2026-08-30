@@ -7,8 +7,8 @@ def test_gemini_client_init(mocker):
     from gemini.client import GeminiClient
     
     client = GeminiClient()
-    assert client.current_key_idx == 0
+    assert client._current_idx == 0
     assert len(client.keys) == 1
     
-    client._rotate_key()
-    assert client.current_key_idx == 0 # Only 1 key in test env
+    await client._rotate_key()
+    assert client._current_idx == 0 # Only 1 key in test env

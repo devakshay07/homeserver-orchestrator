@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import MagicMock, AsyncMock
-from queue.worker import TaskWorker
+from task_queue.worker import TaskWorker
 
 @pytest.mark.asyncio
 async def test_watchdog_restarts_dead_worker(mocker, isolated_settings):

@@ -15,7 +15,7 @@ class SQLiteQueue:
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         return conn
@@ -69,6 +69,7 @@ class SQLiteQueue:
     def dequeue(self) -> Optional[Task]:
         now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json
@@ -80,6 +81,7 @@ class SQLiteQueue:
             row = cursor.fetchone()
             
             if not row:
+                conn.rollback()
                 return None
                 
             task = Task.from_row(row)

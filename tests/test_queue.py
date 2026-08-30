@@ -1,6 +1,6 @@
 import pytest
-from queue.sqlite_queue import SQLiteQueue
-from queue.models import TaskStatus
+from task_queue.sqlite_queue import SQLiteQueue
+from task_queue.models import TaskStatus
 
 def test_enqueue_dequeue(monkeypatch, tmp_path):
     monkeypatch.setattr("config.settings.settings.db_path", str(tmp_path / "test.sqlite"))

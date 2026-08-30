@@ -1,7 +1,6 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 import structlog
-import tzlocal
 from pathlib import Path
 
 from config.settings import settings
@@ -10,15 +9,12 @@ logger = structlog.get_logger("app")
 
 class CronManager:
     def __init__(self):
-        db_url = f"sqlite:///{settings.db_path}"
+        db_url = f"sqlite:///{str(settings.db_path).replace('.sqlite', '_cron.sqlite')}"
         jobstores = {
             'default': SQLAlchemyJobStore(url=db_url, tablename='apscheduler_jobs')
         }
         
-        try:
-            timezone = tzlocal.get_localzone()
-        except:
-            timezone = settings.timezone
+        timezone = settings.timezone
             
         self.scheduler = AsyncIOScheduler(jobstores=jobstores, timezone=str(timezone))
 

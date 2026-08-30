@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from orchestrator import Orchestrator
-from queue.models import Task, TaskStatus, CheckpointKey
+from task_queue.models import Task, TaskStatus, CheckpointKey
 from datetime import datetime, timezone
 
 @pytest.mark.asyncio

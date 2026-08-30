@@ -3,9 +3,9 @@ import structlog
 from pathlib import Path
 
 from config.settings import settings
-from queue.models import Task, TaskStatus, CheckpointKey
+from task_queue.models import Task, TaskStatus, CheckpointKey
 from monitoring.metrics import StageTimer, log_disk_usage
-from queue.sqlite_queue import SQLiteQueue
+from task_queue.sqlite_queue import SQLiteQueue
 from telegram.notifier import TelegramNotifier
 
 from gemini.client import GeminiClient, GeminiQuotaExhausted, GeminiContentBlocked
@@ -52,6 +52,10 @@ class Orchestrator:
         try:
 
             cp = task.checkpoint or {}
+
+            ok, free_gb = self.storage.check_disk_space()
+            if not ok:
+                raise Exception(f"Insufficient disk space: {free_gb:.1f} GB free, {settings.disk_min_free_gb} GB required")
             if not cp:
                 await self.notifier.send_message(f"🚀 Started generating: _{idea}_")
             else:
@@ -64,7 +68,7 @@ class Orchestrator:
                 spec = await self.spec_generator.generate_spec(idea)
                 await self.memory_updater.save_prompt(idea, spec)
                 
-                repo_name = self._extract_repo_name(spec)
+                repo_name = self._extract_repo_name(spec, task.id)
                 project_dir = str(Path(settings.workspace_dir) / f"{repo_name}_{task.id[:8]}")
                 
                 cp[CheckpointKey.SPEC_TEXT] = spec
@@ -89,8 +93,7 @@ class Orchestrator:
                 
                 if ret_code != 0:
                     raise Exception(f"Antigravity CLI failed: {stderr}")
-                    
-                    cp[CheckpointKey.AGY_DONE] = True
+                cp[CheckpointKey.AGY_DONE] = True
                 task.checkpoint = cp
                 self.db_queue.update_task(task)
 
@@ -105,8 +108,7 @@ class Orchestrator:
                     if improvements and len(improvements) > 20:
                         instruction = PromptBuilder.build_readme_update_prompt(improvements)
                         await self.agy_runner.run_command(project_dir_path, instruction)
-                
-                    cp[CheckpointKey.README_DONE] = True
+                cp[CheckpointKey.README_DONE] = True
                 task.checkpoint = cp
                 self.db_queue.update_task(task)
 
@@ -119,7 +121,7 @@ class Orchestrator:
 
                 if report.hard_failed:
                     raise Exception("Quality Gate: hard failure — pipeline aborted")
-                    cp[CheckpointKey.QUALITY_DONE] = True
+                cp[CheckpointKey.QUALITY_DONE] = True
                 task.checkpoint = cp
                 self.db_queue.update_task(task)
                 
@@ -143,9 +145,10 @@ class Orchestrator:
                     user = await asyncio.to_thread(self.pr_manager.client.get_user)
                     await asyncio.to_thread(user.create_repo, repo_name, private=True)
                     
-                remote_url = f"https://x-access-token:{settings.github_pat.get_secret_value()}@github.com/{settings.github_owner}/{repo_name}.git" if settings.github_pat else f"git@github.com:{settings.github_owner}/{repo_name}.git"
+                remote_url = f"https://github.com/{settings.github_owner}/{repo_name}.git"
+                token = settings.github_pat.get_secret_value() if settings.github_pat else None
                 
-                if not await self.repo_manager.push_branch(project_dir_path, remote_url, branch_name):
+                if not await self.repo_manager.push_branch(project_dir_path, remote_url, branch_name, token):
                     raise Exception("Failed to push to GitHub")
                     
                 cp[CheckpointKey.GIT_PUSHED] = True

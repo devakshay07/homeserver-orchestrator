@@ -8,7 +8,7 @@ class TestRunner:
     async def run(self, project_dir: Path) -> bool:
         logger.info("Running tests", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            str(project_dir / ".venv" / "bin" / "pytest"), "--tb=short",
+            str(project_dir / ".venv" / "bin" / str(project_dir / ".venv" / "bin" / "pytest")), "--tb=short",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE

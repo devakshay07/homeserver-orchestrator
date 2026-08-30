@@ -8,7 +8,7 @@ class Linter:
     async def run_format(self, project_dir: Path) -> bool:
         logger.info("Running ruff format", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            "ruff", "format", ".",
+            str(project_dir / ".venv" / "bin" / "ruff"), "format", ".",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
@@ -19,7 +19,7 @@ class Linter:
     async def run_check(self, project_dir: Path) -> bool:
         logger.info("Running ruff check", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            "ruff", "check", ".",
+            str(project_dir / ".venv" / "bin" / "ruff"), "check", ".",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE

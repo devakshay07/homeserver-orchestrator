@@ -86,7 +86,7 @@ class QualityGate:
             
         import asyncio
         proc = await asyncio.create_subprocess_exec(
-            pip_path, "install", "pytest", "mypy",
+            pip_path, "install", "pytest", "mypy", "ruff", "detect-secrets",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE

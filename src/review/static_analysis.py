@@ -9,7 +9,7 @@ class StaticAnalyzer:
         # Assuming python project for now. Adjust based on language detection if needed.
         logger.info("Running mypy", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            str(project_dir / ".venv" / "bin" / "mypy"), ".",
+            str(project_dir / ".venv" / "bin" / str(project_dir / ".venv" / "bin" / "mypy")), ".",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE

@@ -15,4 +15,4 @@ async def test_quality_gate_run(mocker, tmp_path):
     mocker.patch.object(qg.link_checker, "run", return_value=True)
     
     result = await qg.run_all(tmp_path)
-    assert result is True
+    assert not result.hard_failed

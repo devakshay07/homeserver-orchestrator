@@ -4,12 +4,12 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 import structlog
 from textwrap import dedent
 
-from queue.sqlite_queue import SQLiteQueue
-from queue.models import TaskStatus
+from task_queue.sqlite_queue import SQLiteQueue
+from task_queue.models import TaskStatus
 from config.settings import settings
 
 logger = structlog.get_logger("telegram")
-db_queue = SQLiteQueue()
+
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_message:
@@ -52,7 +52,7 @@ async def build_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     idea = " ".join(context.args)
-    task = db_queue.enqueue({"type": "build", "idea": idea})
+    task = context.bot_data['db_queue'].enqueue({"type": "build", "idea": idea})
     
     logger.info("New build task queued", task_id=task.id, idea=idea)
     await update.effective_message.reply_text(
@@ -65,7 +65,7 @@ async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not update.effective_message:
         return
         
-    tasks = db_queue.list_tasks(limit=10)
+    tasks = context.bot_data['db_queue'].list_tasks(limit=10)
     pending_or_progress = [t for t in tasks if t.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.REVIEW, TaskStatus.AWAITING_APPROVAL)]
     
     if not pending_or_progress:
@@ -85,14 +85,14 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     
     if not context.args:
-        tasks = db_queue.list_tasks(limit=1)
+        tasks = context.bot_data['db_queue'].list_tasks(limit=1)
         if not tasks:
             await update.effective_message.reply_text("No recent tasks found.")
             return
         task = tasks[0]
     else:
         task_id = context.args[0]
-        task = db_queue.get_task(task_id)
+        task = context.bot_data['db_queue'].get_task(task_id)
         if not task:
             await update.effective_message.reply_text(f"Task `{task_id}` not found.", parse_mode="Markdown")
             return
@@ -116,7 +116,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     action, _, task_id = data.partition("_")
     if action not in ("approve", "reject", "regenerate", "changes"): return
     
-    task = db_queue.get_task(task_id)
+    task = context.bot_data['db_queue'].get_task(task_id)
     if not task:
         await query.edit_message_text(f"{query.message.text}\n\n⚠️ Error: Task {task_id} not found.")
         return
@@ -140,7 +140,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             try:
                 await pr_manager.merge_pr(repo_name, pr_number)
                 task.status = TaskStatus.DONE
-                db_queue.update_task(task)
+                context.bot_data['db_queue'].update_task(task)
                 await query.edit_message_text(f"{query.message.text}\n\n✅ PR Merged! Task {task_id} is DONE.")
             except Exception as e:
                 await query.edit_message_text(f"{query.message.text}\n\n⚠️ Error merging PR: {e}")
@@ -153,7 +153,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 await pr_manager.close_pr(repo_name, pr_number)
             except: pass
         task.status = TaskStatus.REJECTED
-        db_queue.update_task(task)
+        context.bot_data['db_queue'].update_task(task)
         await query.edit_message_text(f"{query.message.text}\n\n❌ Task {task_id} REJECTED.")
         
     elif action == "regenerate":
@@ -163,7 +163,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             except: pass
         task.status = TaskStatus.PENDING
         task.attempts = 0
-        db_queue.update_task(task)
+        context.bot_data['db_queue'].update_task(task)
         await query.edit_message_text(f"{query.message.text}\n\n🔄 Task {task_id} queued for regeneration.")
         
     elif action == "changes":
@@ -178,7 +178,7 @@ async def pr_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not context.args:
         await update.effective_message.reply_text("Usage: `/pr <task_id>`", parse_mode="Markdown")
         return
-    task = db_queue.get_task(context.args[0])
+    task = context.bot_data['db_queue'].get_task(context.args[0])
     if not task:
         await update.effective_message.reply_text("Task not found.")
         return
@@ -194,7 +194,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if context.args:
         try: limit = int(context.args[0])
         except: pass
-    tasks = db_queue.list_tasks(limit=limit)
+    tasks = context.bot_data['db_queue'].list_tasks(limit=limit)
     completed = [t for t in tasks if t.status in (TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.REJECTED)]
     if not completed:
         await update.effective_message.reply_text("No completed tasks found.")
@@ -227,7 +227,7 @@ async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.effective_message.reply_text("Usage: `/approve <task_id>`", parse_mode="Markdown")
         return
     task_id = context.args[0]
-    task = db_queue.get_task(task_id)
+    task = context.bot_data['db_queue'].get_task(task_id)
     if not task:
         await update.effective_message.reply_text("Task not found.")
         return
@@ -248,7 +248,7 @@ async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         try:
             await pr_manager.merge_pr(repo_name, pr_number)
             task.status = TaskStatus.DONE
-            db_queue.update_task(task)
+            context.bot_data['db_queue'].update_task(task)
             await update.effective_message.reply_text(f"✅ PR Merged! Task {task_id} is DONE.")
         except Exception as e:
             await update.effective_message.reply_text(f"⚠️ Error merging PR: {e}")
@@ -261,7 +261,7 @@ async def reject_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.effective_message.reply_text("Usage: `/reject <task_id>`", parse_mode="Markdown")
         return
     task_id = context.args[0]
-    task = db_queue.get_task(task_id)
+    task = context.bot_data['db_queue'].get_task(task_id)
     if not task:
         await update.effective_message.reply_text("Task not found.")
         return
@@ -281,7 +281,7 @@ async def reject_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except: pass
         
     task.status = TaskStatus.REJECTED
-    db_queue.update_task(task)
+    context.bot_data['db_queue'].update_task(task)
     await update.effective_message.reply_text(f"❌ Task {task_id} REJECTED.")
 
 async def regenerate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -290,7 +290,7 @@ async def regenerate_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.effective_message.reply_text("Usage: `/regenerate <task_id>`", parse_mode="Markdown")
         return
     task_id = context.args[0]
-    task = db_queue.get_task(task_id)
+    task = context.bot_data['db_queue'].get_task(task_id)
     if not task:
         await update.effective_message.reply_text("Task not found.")
         return
@@ -311,7 +311,7 @@ async def regenerate_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
     task.status = TaskStatus.PENDING
     task.attempts = 0
-    db_queue.update_task(task)
+    context.bot_data['db_queue'].update_task(task)
     await update.effective_message.reply_text(f"🔄 Task {task_id} queued for regeneration.")
 
 
@@ -335,7 +335,8 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def pending_notifications_command(update, context):
-    from telegram.notifier import DEAD_LETTER_PATH, TelegramNotifier
+    from telegram.notifier import DEAD_LETTER_PATH
+    import json
     if not DEAD_LETTER_PATH.exists():
         await update.effective_message.reply_text("No pending notifications.", parse_mode="Markdown")
         return
@@ -350,7 +351,7 @@ async def pending_notifications_command(update, context):
     await update.effective_message.reply_text(f"Resending {len(lines)} failed notifications...")
     DEAD_LETTER_PATH.unlink()
     
-    from telegram.bot import tg_app, notifier
+    notifier = context.bot_data['notifier']
     
     for line in lines:
         payload = json.loads(line)
@@ -362,11 +363,15 @@ async def pending_notifications_command(update, context):
 
 async def stats_command(update, context):
     import shutil
-    from queue.models import TaskStatus
-    from main import db_queue, worker, cron_manager
+    from task_queue.models import TaskStatus
+    
     stat = shutil.disk_usage("data/")
     free_gb = stat.free / (1024 ** 3)
     used_pct = (stat.used / stat.total) * 100
+    
+    db_queue = context.bot_data['db_queue']
+    worker = context.bot_data['worker']
+    cron_manager = context.bot_data['cron_manager']
     
     tasks = db_queue.list_tasks(limit=200)
     pending = sum(1 for t in tasks if t.status == TaskStatus.PENDING)
@@ -379,14 +384,13 @@ async def stats_command(update, context):
         
     num_jobs = 0
     if cron_manager and hasattr(cron_manager, 'scheduler'):
-        num_jobs = len(cron_manager.scheduler.get_jobs())
+        num_jobs = len(context.bot_data['cron_manager'].scheduler.get_jobs())
 
     msg = (
-        f"📊 *HomeServer Stats*\n\n" \
-
-        f"💾 Disk: `{free_gb:.1f}` GB free (`{used_pct:.0f}%` used)\n" \
-        f"📋 Tasks: `{pending}` pending | `{done}` done | `{failed}` failed\n" \
-        f"⚙️ Worker: `{'running' if is_running else 'stopped'}`\n" \
+        f"📊 *HomeServer Stats*\n\n"
+        f"💾 Disk: `{free_gb:.1f}` GB free (`{used_pct:.0f}%` used)\n"
+        f"📋 Tasks: `{pending}` pending | `{done}` done | `{failed}` failed\n"
+        f"⚙️ Worker: `{'running' if is_running else 'stopped'}`\n"
         f"📅 Cron jobs: `{num_jobs}`"
     )
     await update.effective_message.reply_text(msg, parse_mode="Markdown")
@@ -412,7 +416,7 @@ def register_handlers(app) -> None:
 
 
 from scheduler.job_builder import JobBuilder
-from scheduler.cron_manager import cron_manager
+
 
 async def cron_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_message: return
@@ -432,7 +436,7 @@ async def cron_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     cmd = args[0].lower()
     
     if cmd == "list":
-        jobs = cron_manager.get_jobs()
+        jobs = context.bot_data['cron_manager'].get_jobs()
         if not jobs:
             await update.effective_message.reply_text("No scheduled jobs.")
             return
@@ -447,7 +451,7 @@ async def cron_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if len(args) < 2:
             await update.effective_message.reply_text("Provide a job ID.")
             return
-        if cron_manager.remove_job(args[1]):
+        if context.bot_data['cron_manager'].remove_job(args[1]):
             await update.effective_message.reply_text("Job removed.")
         else:
             await update.effective_message.reply_text("Failed to remove job.")
