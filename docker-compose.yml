@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  homeserver:
+    build: .
+    container_name: homeserver
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    # Edge device constraints - tune these as per actual hardware
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
