@@ -1,6 +1,7 @@
+from __future__ import annotations
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, SecretStr
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
     # Telegram
@@ -13,9 +14,9 @@ class Settings(BaseSettings):
     gemini_model_review: str = "gemini-2.0-flash"
 
     # GitHub
-    github_app_id: str | None = None
-    github_app_private_key_path: str | None = None
-    github_pat: SecretStr | None = None
+    github_app_id: Optional[str] = None
+    github_app_private_key_path: Optional[str] = None
+    github_pat: Optional[SecretStr] = None
     github_owner: str
 
     # Paths

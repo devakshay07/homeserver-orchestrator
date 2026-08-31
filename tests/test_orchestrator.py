@@ -37,3 +37,16 @@ async def test_spec_stage_skipped_when_checkpointed(mocker, isolated_settings):
     
     await orch.process_task(task)
     mock_gen.assert_not_called()
+
+def test_extract_repo_name_with_project():
+    from orchestrator import Orchestrator
+    orchestrator = Orchestrator(None, None)
+    spec = "# Project: my-project\nSome text"
+    assert orchestrator._extract_repo_name(spec, "task-123") == "my-project"
+
+def test_extract_repo_name_fallback():
+    from orchestrator import Orchestrator
+    orchestrator = Orchestrator(None, None)
+    spec = "Some text without project"
+    assert orchestrator._extract_repo_name(spec, "task-123456789") == "generated-project-task-123"
+

@@ -57,18 +57,41 @@ class QualityGate:
     async def run_all(self, project_dir: Path) -> GateReport:
         logger.info("Starting Quality Gate", project_dir=str(project_dir))
         
-        # 0. Setup isolated virtual environment
-        venv_dir = project_dir / ".venv"
-        if not venv_dir.exists():
-            import asyncio
-            logger.info("Creating virtual environment for generated project")
-            proc = await asyncio.create_subprocess_exec(
-                "python3", "-m", "venv", ".venv",
-                cwd=str(project_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await proc.communicate()
+        import asyncio
+        image_name = f"sandbox-{project_dir.name.lower()}"
+        logger.info("Building Docker sandbox", image=image_name)
+        
+        dockerfile = """FROM python:3.9-slim
+RUN pip install --no-cache-dir pytest mypy ruff detect-secrets
+WORKDIR /app
+"""
+        if (project_dir / "requirements.txt").exists():
+            dockerfile += """COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+"""
+            
+        df_path = project_dir / "Dockerfile.sandbox"
+        df_path.write_text(dockerfile)
+        
+        build_proc = await asyncio.create_subprocess_exec(
+            "docker", "build", "-t", image_name, "-f", "Dockerfile.sandbox", ".",
+            cwd=str(project_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(build_proc.communicate(), timeout=300)
+            if build_proc.returncode != 0:
+                logger.error("Sandbox build failed", error=stderr.decode())
+                report = GateReport()
+                report.stages.append(StageResult(name="Sandbox Build", passed=False, policy=GatePolicy.BLOCK))
+                return report
+        except asyncio.TimeoutError:
+            build_proc.kill()
+            logger.error("Sandbox build timed out")
+            report = GateReport()
+            report.stages.append(StageResult(name="Sandbox Build", passed=False, policy=GatePolicy.BLOCK))
+            return report
 
         pip_path = str(venv_dir / "bin" / "pip")
         

@@ -1,31 +1,49 @@
 import asyncio
 import structlog
+import os
 from pathlib import Path
 
 logger = structlog.get_logger("app")
 
 class Linter:
     async def run_format(self, project_dir: Path) -> bool:
-        logger.info("Running ruff format", project_dir=str(project_dir))
+        image_name = f"sandbox-{project_dir.name.lower()}"
+        logger.info("Running ruff format in Docker", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            str(project_dir / ".venv" / "bin" / "ruff"), "format", ".",
+            "docker", "run", "--rm", "--network", "none",
+            # We need to run format as the current user so it can write back to the host filesystem
+            # Wait, `ruff format` modifies files. We must pass --user $(id -u):$(id -g) but that's shell logic.
+            # We can use os.getuid() and os.getgid().
+            "-u", f"{os.getuid()}:{os.getgid()}", "-v", f"{project_dir.absolute()}:/app", "-w", "/app",
+            image_name, "ruff", "format", ".",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        await process.communicate()
-        return True # formatting should not fail the build usually
+        try:
+            await asyncio.wait_for(process.communicate(), timeout=120)
+            return True
+        except asyncio.TimeoutError:
+            process.kill()
+            return False
 
     async def run_check(self, project_dir: Path) -> bool:
-        logger.info("Running ruff check", project_dir=str(project_dir))
+        image_name = f"sandbox-{project_dir.name.lower()}"
+        logger.info("Running ruff check in Docker", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            str(project_dir / ".venv" / "bin" / "ruff"), "check", ".",
+            "docker", "run", "--rm", "--network", "none",
+            "-u", f"{os.getuid()}:{os.getgid()}", "-v", f"{project_dir.absolute()}:/app", "-w", "/app",
+            image_name, "ruff", "check", ".",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
-        if process.returncode != 0:
-            logger.error("Linting failed", output=stdout.decode(), error=stderr.decode())
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
+            if process.returncode != 0:
+                logger.error("Linting failed", output=stdout.decode(), error=stderr.decode())
+                return False
+            return True
+        except asyncio.TimeoutError:
+            process.kill()
             return False
-        return True

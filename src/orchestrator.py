@@ -37,12 +37,11 @@ class Orchestrator:
         self.memory_updater = MemoryUpdater()
         self.storage = StorageLifecycle(settings.workspace_dir, settings.disk_min_free_gb, settings.workspace_max_age_days)
         
-    def _extract_repo_name(self, spec: str) -> str:
-        # Simple extraction: look for a heading or just slugify the first few words
-        match = re.search(r'# Project:\s*([a-zA-Z0-9_-]+)', spec)
+    def _extract_repo_name(self, spec: str, task_id: str) -> str:
+        match = re.search(r"# Project:\s*([a-zA-Z0-9_-]+)", spec)
         if match:
             return match.group(1).lower()
-        return "generated-project"
+        return f"generated-project-{task_id[:8]}"
 
 
     async def process_task(self, task: Task) -> None:

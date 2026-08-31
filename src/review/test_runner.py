@@ -1,20 +1,31 @@
 import asyncio
 import structlog
+import os
 from pathlib import Path
 
 logger = structlog.get_logger("app")
 
 class TestRunner:
     async def run(self, project_dir: Path) -> bool:
-        logger.info("Running tests", project_dir=str(project_dir))
+        image_name = f"sandbox-{project_dir.name.lower()}"
+        logger.info("Running tests in Docker", project_dir=str(project_dir))
+        
+        # docker run --rm --network none -v $(pwd):/app -w /app image_name pytest --tb=short
         process = await asyncio.create_subprocess_exec(
-            str(project_dir / ".venv" / "bin" / str(project_dir / ".venv" / "bin" / "pytest")), "--tb=short",
+            "docker", "run", "--rm", "--network", "none",
+            "-u", f"{os.getuid()}:{os.getgid()}", "-v", f"{project_dir.absolute()}:/app", "-w", "/app",
+            image_name, "pytest", "--tb=short",
             cwd=str(project_dir),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
-        if process.returncode != 0:
-            logger.error("Tests failed", output=stdout.decode(), error=stderr.decode())
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300)
+            if process.returncode != 0:
+                logger.error("Tests failed", output=stdout.decode(), error=stderr.decode())
+                return False
+            return True
+        except asyncio.TimeoutError:
+            process.kill()
+            logger.error("Tests timed out in Docker")
             return False
-        return True
