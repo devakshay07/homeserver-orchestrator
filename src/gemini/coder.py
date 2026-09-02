@@ -14,6 +14,30 @@ class GeminiCoder:
         self.client = client
         self.ignore_dirs = {".git", ".venv", "__pycache__", "node_modules"}
 
+    async def _load_skills(self, instruction: str) -> str:
+        skills_dir = Path("skills")
+        if not skills_dir.exists():
+            return ""
+            
+        available_skills = [f.stem for f in skills_dir.glob("*.md")]
+        if not available_skills:
+            return ""
+            
+        prompt = f"Instruction: '{instruction[:100]}...'\nWhich of these skills apply? {', '.join(available_skills)}. Return a comma separated list of skill names only."
+        try:
+            response = await self.client.generate_content("gemini-1.5-flash", prompt)
+            selected = [s.strip() for s in response.split(",") if s.strip() in available_skills]
+        except Exception:
+            selected = available_skills
+            
+        skills_text = []
+        for s in selected:
+            path = skills_dir / f"{s}.md"
+            if path.exists():
+                skills_text.append(path.read_text())
+                
+        return "\n".join(skills_text)
+
     def _summarize_context(self, project_dir: Path) -> str:
         """Intelligently summarizes the workspace to provide context across API calls."""
         if not project_dir.exists():
@@ -49,9 +73,13 @@ class GeminiCoder:
     async def generate(self, project_dir: Path, instruction: str) -> Tuple[int, str, str]:
         project_dir.mkdir(parents=True, exist_ok=True)
         context = self._summarize_context(project_dir)
+        skills = await self._load_skills(instruction)
         
         prompt = f"""You are an autonomous Senior Software Engineer.
 Your job is to read the current project context, and output the EXACT file changes needed to fulfill the instruction.
+
+PROJECT BEST PRACTICES (SKILLS):
+{skills}
 
 CURRENT PROJECT CONTEXT:
 {context}
