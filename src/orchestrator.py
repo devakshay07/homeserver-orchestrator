@@ -13,8 +13,8 @@ from telegram.notifier import TelegramNotifier
 from gemini.client import GeminiClient, GeminiQuotaExhausted, GeminiContentBlocked
 from gemini.spec_generator import SpecGenerator
 from gemini.readme_reviewer import ReadmeReviewer
-from antigravity.runner import AntigravityRunner
-from antigravity.prompt_builder import PromptBuilder
+from gemini.coder import GeminiCoder
+from gemini.prompt_builder import PromptBuilder
 from review.quality_gate import QualityGate
 from github.repo_manager import RepoManager
 from github.pr_manager import PRManager
@@ -40,7 +40,7 @@ class Orchestrator:
         self.gemini_client = GeminiClient()
         self.spec_generator = SpecGenerator(self.gemini_client)
         self.readme_reviewer = ReadmeReviewer(self.gemini_client)
-        self.agy_runner = AntigravityRunner(settings.workspace_dir)
+        self.gemini_coder = GeminiCoder(self.gemini_client)
         self.quality_gate = QualityGate()
         self.repo_manager = RepoManager(settings.workspace_dir)
         self.pr_manager = PRManager()
@@ -132,10 +132,10 @@ class Orchestrator:
             await self.notifier.send_message(f"⚙️ Generating Code for `{repo_name}`...")
         
         instruction = PromptBuilder.build_generation_prompt(spec)
-        ret_code, stdout, stderr = await self.agy_runner.run_command(project_dir, instruction)
+        ret_code, stdout, stderr = await self.gemini_coder.generate(project_dir, instruction)
         
         if ret_code != 0:
-            raise Exception(f"Antigravity CLI failed: {stderr}")
+            raise Exception(f"Gemini Coder failed: {stderr}")
             
         return JobState.TESTING.value
 
@@ -171,10 +171,10 @@ class Orchestrator:
         
         # We tell agy to fix the code
         instruction = f"The previous tests failed with the following report:\n\n{failures}\n\nPlease analyze the codebase, identify the bug, and modify the files to fix it."
-        ret_code, stdout, stderr = await self.agy_runner.run_command(project_dir, instruction)
+        ret_code, stdout, stderr = await self.gemini_coder.generate(project_dir, instruction)
         
         if ret_code != 0:
-            raise Exception(f"Antigravity Debugging failed: {stderr}")
+            raise Exception(f"Gemini Debugging failed: {stderr}")
             
         return JobState.TESTING.value
 
@@ -189,7 +189,7 @@ class Orchestrator:
             improvements = await self.readme_reviewer.review(readme_content)
             if improvements and len(improvements) > 20:
                 instruction = PromptBuilder.build_readme_update_prompt(improvements)
-                await self.agy_runner.run_command(project_dir, instruction)
+                await self.gemini_coder.generate(project_dir, instruction)
                 
         return JobState.PR_CREATED.value
 

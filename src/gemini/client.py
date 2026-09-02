@@ -39,6 +39,8 @@ class GeminiClient:
             logger.info("Rotated Gemini API key", new_idx=self._current_idx)
 
     async def _call_api(self, model_name: str, key: str, prompt: str, system_instruction: Optional[str] = None) -> str:
+        # Load balance: proactively rotate before making the call
+        await self._rotate_key()
         async with self._lock:
             genai.configure(api_key=key)
             model = genai.GenerativeModel(
