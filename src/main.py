@@ -22,6 +22,7 @@ tg_app, notifier = build_app()
 
 from orchestrator import Orchestrator
 from gemini.triage import TriageAgent
+from maintenance.system_cleaner import SystemCleaner
 orchestrator = Orchestrator(db_queue, notifier)
 
 worker = TaskWorker(db_queue, orchestrator.process_task)
@@ -72,9 +73,22 @@ async def main() -> None:
     await tg_app.start()
     await tg_app.updater.start_polling()
     
+
     # Start Worker
     worker.start()
     cron_manager.start()
+    
+    # Schedule Nightly Maintenance
+    cleaner = SystemCleaner(notifier)
+    cron_manager.scheduler.add_job(
+        cleaner.run_nightly_maintenance,
+        'cron',
+        hour=3,
+        minute=0,
+        id='nightly_system_maintenance',
+        replace_existing=True
+    )
+
     
     await notifier.send_message("🟢 HomeServer is online and ready.")
     
