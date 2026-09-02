@@ -52,15 +52,38 @@ async def build_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     idea = " ".join(context.args)
-    task = context.bot_data['db_queue'].enqueue({"type": "build", "idea": idea})
+    status_msg = await update.effective_message.reply_text("🤔 Analyzing your request...")
     
-    logger.info("New build task queued", task_id=task.id, idea=idea)
-    await update.effective_message.reply_text(
-        f"✅ Task queued successfully\\!\n\n*ID:* `{task.id}`",
-
-        parse_mode="MarkdownV2"
-    )
-
+    triage_agent = context.bot_data.get('triage_agent')
+    if triage_agent:
+        analysis = await triage_agent.analyze_request(idea)
+        if analysis.get("needs_clarification"):
+            question = analysis.get("clarification_question", "Could you provide more details about this project?")
+            await status_msg.edit_text(f"❓ **Clarification Needed:**\n\n{question}", parse_mode="Markdown")
+            return
+            
+        tasks_to_queue = analysis.get("tasks", [idea])
+    else:
+        tasks_to_queue = [idea]
+        
+    db_queue = context.bot_data['db_queue']
+    
+    if len(tasks_to_queue) == 1:
+        task = db_queue.enqueue({"type": "build", "idea": tasks_to_queue[0]})
+        logger.info("New build task queued", task_id=task.id, idea=tasks_to_queue[0])
+        await status_msg.edit_text(f"✅ Task queued successfully!\n\n*ID:* `{task.id}`", parse_mode="MarkdownV2")
+    else:
+        queued_ids = []
+        for t_idea in tasks_to_queue:
+            t = db_queue.enqueue({"type": "build", "idea": t_idea})
+            queued_ids.append(t.id)
+            logger.info("New build sub-task queued", task_id=t.id, idea=t_idea)
+            
+        msg = "✅ Splitting request into multiple tasks:\n\n"
+        for i, t_id in enumerate(queued_ids):
+            msg += f"• `{t_id[:8]}`: {tasks_to_queue[i][:30]}...\n"
+            
+        await status_msg.edit_text(msg, parse_mode="Markdown")
 async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_message:
         return

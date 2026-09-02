@@ -21,6 +21,7 @@ db_queue = SQLiteQueue()
 tg_app, notifier = build_app()
 
 from orchestrator import Orchestrator
+from gemini.triage import TriageAgent
 orchestrator = Orchestrator(db_queue, notifier)
 
 worker = TaskWorker(db_queue, orchestrator.process_task)
@@ -30,6 +31,7 @@ tg_app.bot_data['db_queue'] = db_queue
 tg_app.bot_data['notifier'] = notifier
 tg_app.bot_data['worker'] = worker
 tg_app.bot_data['cron_manager'] = cron_manager
+tg_app.bot_data['triage_agent'] = TriageAgent(orchestrator.gemini_client)
 
 async def shutdown(sig: signal.Signals | None = None) -> None:
     if sig:
