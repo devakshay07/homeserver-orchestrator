@@ -10,7 +10,7 @@ class StaticAnalyzer:
         image_name = f"sandbox-{project_dir.name.lower()}"
         logger.info("Running mypy in Docker", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            "docker", "run", "--rm", "--network", "none",
+            "docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--cpus=1.0", "--memory=512m", "--pids-limit=100", "--read-only", "--tmpfs", "/tmp",
             "-u", f"{os.getuid()}:{os.getgid()}", "-v", f"{project_dir.absolute()}:/app", "-w", "/app",
             image_name, "mypy", ".",
             cwd=str(project_dir),

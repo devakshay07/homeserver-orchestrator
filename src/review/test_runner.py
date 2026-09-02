@@ -12,7 +12,7 @@ class TestRunner:
         
         # docker run --rm --network none -v $(pwd):/app -w /app image_name pytest --tb=short
         process = await asyncio.create_subprocess_exec(
-            "docker", "run", "--rm", "--network", "none",
+            "docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--cpus=1.0", "--memory=512m", "--pids-limit=100", "--read-only", "--tmpfs", "/tmp",
             "-u", f"{os.getuid()}:{os.getgid()}", "-v", f"{project_dir.absolute()}:/app", "-w", "/app",
             image_name, "pytest", "--tb=short",
             cwd=str(project_dir),

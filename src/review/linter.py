@@ -10,7 +10,7 @@ class Linter:
         image_name = f"sandbox-{project_dir.name.lower()}"
         logger.info("Running ruff format in Docker", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            "docker", "run", "--rm", "--network", "none",
+            "docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--cpus=1.0", "--memory=512m", "--pids-limit=100", "--read-only", "--tmpfs", "/tmp",
             # We need to run format as the current user so it can write back to the host filesystem
             # Wait, `ruff format` modifies files. We must pass --user $(id -u):$(id -g) but that's shell logic.
             # We can use os.getuid() and os.getgid().
@@ -31,7 +31,7 @@ class Linter:
         image_name = f"sandbox-{project_dir.name.lower()}"
         logger.info("Running ruff check in Docker", project_dir=str(project_dir))
         process = await asyncio.create_subprocess_exec(
-            "docker", "run", "--rm", "--network", "none",
+            "docker", "run", "--rm", "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--cpus=1.0", "--memory=512m", "--pids-limit=100", "--read-only", "--tmpfs", "/tmp",
             "-u", f"{os.getuid()}:{os.getgid()}", "-v", f"{project_dir.absolute()}:/app", "-w", "/app",
             image_name, "ruff", "check", ".",
             cwd=str(project_dir),
