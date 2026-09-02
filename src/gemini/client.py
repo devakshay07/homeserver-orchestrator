@@ -38,7 +38,7 @@ class GeminiClient:
             self._current_idx = (self._current_idx + 1) % len(self.keys)
             logger.info("Rotated Gemini API key", new_idx=self._current_idx)
 
-    async def _call_api(self, model_name: str, key: str, prompt: str, system_instruction: Optional[str] = None) -> str:
+    async def _call_api(self, model_name: str, key: str, prompt: str, system_instruction: Optional[str] = None, media_data: Optional[dict] = None) -> str:
         # Load balance: proactively rotate before making the call
         await self._rotate_key()
         async with self._lock:
@@ -47,15 +47,19 @@ class GeminiClient:
                 model_name=model_name,
                 system_instruction=system_instruction
             )
+            contents = [prompt]
+            if media_data:
+                contents.insert(0, media_data)
+                
             response = await model.generate_content_async(
-                prompt,
+                contents,
                 safety_settings=self.safety_settings
             )
             if response.parts:
                 return response.text
             return ""
 
-    async def generate_content(self, model_name: str, prompt: str, system_instruction: Optional[str] = None) -> str:
+    async def generate_content(self, model_name: str, prompt: str, system_instruction: Optional[str] = None, media_data: Optional[dict] = None) -> str:
         for model in self._get_model_chain(model_name):
             keys_tried: set[int] = set()
             backoff = 2
@@ -64,7 +68,7 @@ class GeminiClient:
                 key_idx = self._current_idx
                 key = self.keys[key_idx]
                 try:
-                    return await self._call_api(model, key, prompt, system_instruction)
+                    return await self._call_api(model, key, prompt, system_instruction, media_data)
                 except Exception as e:
                     error_msg = str(e).lower()
                     logger.warning("Gemini API error", attempt=attempt, error=error_msg, model=model)

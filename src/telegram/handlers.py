@@ -1,6 +1,6 @@
 import json
 from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 import structlog
 from textwrap import dedent
 
@@ -418,10 +418,69 @@ async def stats_command(update, context):
     )
     await update.effective_message.reply_text(msg, parse_mode="Markdown")
 
+
+async def voice_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_message or not update.effective_message.voice:
+        return
+        
+    status_msg = await update.effective_message.reply_text("🎤 Listening...")
+    
+    try:
+        # Download the voice note
+        voice_file = await update.effective_message.voice.get_file()
+        file_bytes = await voice_file.download_as_bytearray()
+        
+        # Use Gemini to transcribe
+        triage_agent = context.bot_data.get('triage_agent')
+        if not triage_agent:
+            await status_msg.edit_text("❌ TriageAgent not initialized.")
+            return
+            
+        media_data = {
+            "mime_type": "audio/ogg",
+            "data": file_bytes
+        }
+        
+        transcript = await triage_agent.client.generate_content("gemini-1.5-flash", "Transcribe this audio precisely. Return only the transcription text.", media_data=media_data)
+        
+        await status_msg.edit_text(f"🗣️ *Transcript:* _{transcript}_\n\n🤔 Analyzing request...", parse_mode="Markdown")
+        
+        # Proceed with triage exactly like build_command
+        idea = transcript
+        analysis = await triage_agent.analyze_request(idea)
+        
+        if analysis.get("needs_clarification"):
+            question = analysis.get("clarification_question", "Could you provide more details?")
+            await status_msg.edit_text(f"🗣️ *Transcript:* _{transcript}_\n\n❓ **Clarification Needed:**\n\n{question}", parse_mode="Markdown")
+            return
+            
+        tasks_to_queue = analysis.get("tasks", [idea])
+        db_queue = context.bot_data['db_queue']
+        
+        if len(tasks_to_queue) == 1:
+            task = db_queue.enqueue({"type": "build", "idea": tasks_to_queue[0]})
+            logger.info("New build task queued via voice", task_id=task.id)
+            await status_msg.edit_text(f"🗣️ *Transcript:* _{transcript}_\n\n✅ Task queued successfully!\n\n*ID:* `{task.id}`", parse_mode="Markdown")
+        else:
+            queued_ids = []
+            for t_idea in tasks_to_queue:
+                t = db_queue.enqueue({"type": "build", "idea": t_idea})
+                queued_ids.append(t.id)
+                
+            msg = f"🗣️ *Transcript:* _{transcript}_\n\n✅ Splitting request into multiple tasks:\n\n"
+            for i, t_id in enumerate(queued_ids):
+                msg += f"• `{t_id[:8]}`: {tasks_to_queue[i][:30]}...\n"
+            await status_msg.edit_text(msg, parse_mode="Markdown")
+            
+    except Exception as e:
+        logger.error("Voice command failed", error=str(e))
+        await status_msg.edit_text(f"❌ Failed to process voice note: {str(e)}")
+
 def register_handlers(app) -> None:
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("build", build_command))
+    app.add_handler(MessageHandler(filters.VOICE, voice_command))
     app.add_handler(CommandHandler("queue", queue_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("cron", cron_command))
