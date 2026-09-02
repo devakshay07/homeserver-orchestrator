@@ -27,12 +27,12 @@ async def run_scheduled_build(idea: str):
             tasks_to_queue = [idea]
             
         for t_idea in tasks_to_queue:
-            task = db_queue.enqueue({"type": "build", "idea": t_idea})
+            task = db_queue.enqueue({"type": "build", "idea": t_idea}, priority=10)
             logger.info("Queued scheduled sub-task", task_id=task.id, idea=t_idea)
             
     except Exception as e:
         logger.error("Triage failed for scheduled job, using fallback", error=str(e))
-        task = db_queue.enqueue({"type": "build", "idea": idea})
+        task = db_queue.enqueue({"type": "build", "idea": idea}, priority=10)
         logger.info("Queued scheduled task", task_id=task.id)
 
 

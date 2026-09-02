@@ -48,21 +48,22 @@ class SQLiteQueue:
             """, (TaskStatus.FAILED.value, datetime.now(timezone.utc).isoformat(), TaskStatus.IN_PROGRESS.value, settings.max_retries))
             conn.commit()
 
-    def enqueue(self, payload: dict) -> Task:
+    def enqueue(self, payload: dict, priority: int = 0) -> Task:
         now = datetime.now(timezone.utc)
         task = Task(
             id=str(uuid.uuid4()),
             status=TaskStatus.PENDING,
             payload=payload,
             created_at=now,
-            updated_at=now
+            updated_at=now,
+            priority=priority
         )
         with self._get_conn() as conn:
             data = task.to_dict()
             conn.execute("""
-                INSERT INTO tasks (id, status, payload_json, created_at, updated_at, attempts, checkpoint_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (data["id"], data["status"], data["payload_json"], data["created_at"], data["updated_at"], data["attempts"], data["checkpoint_json"]))
+                INSERT INTO tasks (id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority, priority)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (data["id"], data["status"], data["payload_json"], data["created_at"], data["updated_at"], data["attempts"], data["checkpoint_json"], data["priority"]))
             conn.commit()
         return task
 
@@ -72,10 +73,10 @@ class SQLiteQueue:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json
+                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority
                 FROM tasks
                 WHERE status = ? AND attempts < ?
-                ORDER BY created_at ASC
+                ORDER BY priority DESC, created_at ASC
                 LIMIT 1
             """, (TaskStatus.PENDING.value, settings.max_retries))
             row = cursor.fetchone()
@@ -103,16 +104,16 @@ class SQLiteQueue:
             data = task.to_dict()
             conn.execute("""
                 UPDATE tasks
-                SET status = ?, payload_json = ?, updated_at = ?, attempts = ?, checkpoint_json = ?
+                SET status = ?, payload_json = ?, updated_at = ?, attempts = ?, checkpoint_json = ?, priority = ?
                 WHERE id = ?
-            """, (data["status"], data["payload_json"], data["updated_at"], data["attempts"], data["checkpoint_json"], data["id"]))
+            """, (data["status"], data["payload_json"], data["updated_at"], data["attempts"], data["checkpoint_json"], data["priority"], data["id"]))
             conn.commit()
 
     def get_task(self, task_id: str) -> Optional[Task]:
         with self._get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json
+                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority
                 FROM tasks
                 WHERE id = ?
             """, (task_id,))
@@ -125,7 +126,7 @@ class SQLiteQueue:
         with self._get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json
+                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority
                 FROM tasks
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?

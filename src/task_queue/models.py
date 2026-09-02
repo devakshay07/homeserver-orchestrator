@@ -21,6 +21,7 @@ class Task:
     created_at: datetime
     updated_at: datetime
     attempts: int = 0
+    priority: int = 0
     checkpoint: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -31,6 +32,7 @@ class Task:
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "attempts": self.attempts,
+            "priority": self.priority,
             "checkpoint_json": json.dumps(self.checkpoint)
         }
 
@@ -43,6 +45,7 @@ class Task:
             created_at=datetime.fromisoformat(row[3]),
             updated_at=datetime.fromisoformat(row[4]),
             attempts=row[5],
+            priority=row[7] if len(row) > 7 else 0,
             checkpoint=json.loads(row[6]) if row[6] else {}
         )
 
