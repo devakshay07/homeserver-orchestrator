@@ -1,3 +1,4 @@
+from config.settings import settings
 import asyncio
 import structlog
 import json
@@ -25,7 +26,7 @@ class GeminiCoder:
             
         prompt = f"Instruction: '{instruction[:100]}...'\nWhich of these skills apply? {', '.join(available_skills)}. Return a comma separated list of skill names only."
         try:
-            response = await self.client.generate_content("gemini-1.5-flash", prompt)
+            response = await self.client.generate_content(settings.gemini_model_spec, prompt)
             selected = [s.strip() for s in response.split(",") if s.strip() in available_skills]
         except Exception:
             selected = available_skills
@@ -104,7 +105,7 @@ Do NOT omit code. Provide the full file content for any updated file.
         logger.info("Calling Gemini Coder", project_dir=str(project_dir))
         
         try:
-            response_text = await self.client.generate_content("gemini-1.5-pro", prompt) # Use pro for heavy coding
+            response_text = await self.client.generate_content(settings.gemini_model_review, prompt) # Use pro for heavy coding
             
             # Clean potential markdown wrapping
             response_text = response_text.strip()

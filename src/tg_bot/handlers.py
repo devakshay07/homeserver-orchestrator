@@ -148,7 +148,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(f"{query.message.text}\n\n⚠️ Error: Task is not awaiting approval. Current status: {task.status.value}")
         return
         
-    from github.pr_manager import PRManager
+    from gh_client.pr_manager import PRManager
     pr_manager = PRManager()
     
     repo_name = task.payload.get('repo_name')
@@ -266,7 +266,7 @@ async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         except: pass
         
     if repo_name and pr_number:
-        from github.pr_manager import PRManager
+        from gh_client.pr_manager import PRManager
         pr_manager = PRManager()
         try:
             await pr_manager.merge_pr(repo_name, pr_number)
@@ -297,7 +297,7 @@ async def reject_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except: pass
         
     if repo_name and pr_number:
-        from github.pr_manager import PRManager
+        from gh_client.pr_manager import PRManager
         pr_manager = PRManager()
         try:
             await pr_manager.close_pr(repo_name, pr_number)
@@ -326,7 +326,7 @@ async def regenerate_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except: pass
         
     if repo_name and pr_number and task.status == TaskStatus.AWAITING_APPROVAL:
-        from github.pr_manager import PRManager
+        from gh_client.pr_manager import PRManager
         pr_manager = PRManager()
         try:
             await pr_manager.close_pr(repo_name, pr_number)
@@ -441,7 +441,7 @@ async def voice_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             "data": file_bytes
         }
         
-        transcript = await triage_agent.client.generate_content("gemini-1.5-flash", "Transcribe this audio precisely. Return only the transcription text.", media_data=media_data)
+        transcript = await triage_agent.client.generate_content(settings.gemini_model_spec, "Transcribe this audio precisely. Return only the transcription text.", media_data=media_data)
         
         await status_msg.edit_text(f"🗣️ *Transcript:* _{transcript}_\n\n🤔 Analyzing request...", parse_mode="Markdown")
         

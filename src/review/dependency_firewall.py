@@ -1,3 +1,4 @@
+from config.settings import settings
 import asyncio
 import structlog
 from pathlib import Path
@@ -38,7 +39,7 @@ Respond in RAW JSON ONLY:
 }}
 """
         try:
-            response = await self.client.generate_content("gemini-1.5-flash", prompt)
+            response = await self.client.generate_content(settings.gemini_model_spec, prompt)
             response = response.strip()
             if response.startswith("```json"):
                 response = response[7:]
