@@ -79,7 +79,7 @@ async def main() -> None:
     cron_manager.start()
     
     # Schedule Nightly Maintenance
-    cleaner = SystemCleaner(notifier)
+    cleaner = SystemCleaner(None)
     cron_manager.scheduler.add_job(
         cleaner.run_nightly_maintenance,
         'cron',
