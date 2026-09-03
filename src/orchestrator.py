@@ -17,8 +17,8 @@ from gemini.prompt_builder import PromptBuilder
 from gemini.coder import GeminiCoder
 from review.quality_gate import QualityGate
 from review.dependency_firewall import DependencyFirewall
-from github.repo_manager import RepoManager
-from github.pr_manager import PRManager
+from gh_client.repo_manager import RepoManager
+from gh_client.pr_manager import PRManager
 from memory.retriever import Retriever
 from memory.updater import MemoryUpdater
 from storage.lifecycle import StorageLifecycle
