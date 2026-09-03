@@ -30,7 +30,8 @@ class SQLiteQueue:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     attempts INTEGER NOT NULL DEFAULT 0,
-                    checkpoint_json TEXT
+                    checkpoint_json TEXT,
+                    priority INTEGER DEFAULT 0
                 )
             """)
             # Reset tasks that were in progress before a crash/restart, but only if they haven't exceeded max_retries
@@ -61,7 +62,7 @@ class SQLiteQueue:
         with self._get_conn() as conn:
             data = task.to_dict()
             conn.execute("""
-                INSERT INTO tasks (id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority, priority)
+                INSERT INTO tasks (id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (data["id"], data["status"], data["payload_json"], data["created_at"], data["updated_at"], data["attempts"], data["checkpoint_json"], data["priority"]))
             conn.commit()
