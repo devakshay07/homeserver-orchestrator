@@ -90,7 +90,10 @@ async def main() -> None:
     )
 
     
-    await notifier.send_message("🟢 HomeServer is online and ready.")
+    try:
+        await notifier.send_message("🟢 HomeServer is online and ready.")
+    except Exception as e:
+        logger.error(f"Failed to send startup message: {e}")
     
     # Keep the main loop running
     while True:
