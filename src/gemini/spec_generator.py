@@ -23,7 +23,7 @@ class SpecGenerator:
         past_prompts = await self.retriever.search_prompts(user_idea, n_results=1)
         past_context = ""
         if past_prompts:
-            past_context = "\n# Past Relevant Context\n" + past_prompts
+            past_context = "\n# Past Relevant Context\n" + "\n".join(past_prompts)
             
         system_instruction = (
             "You are an expert Systems Architect. You must generate an extremely detailed "
