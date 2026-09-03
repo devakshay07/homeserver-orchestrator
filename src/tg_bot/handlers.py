@@ -96,13 +96,10 @@ async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await update.effective_message.reply_text("The queue is currently empty.")
             return
             
-        response = "📋 Current Queue:
-
-"
+        response = "📋 Current Queue:\n\n"
         for t in pending_or_progress:
             idea = t.payload.get("idea", "Unknown")[:30].replace("_", " ").replace("*", " ") + "..."
-            response += f"- {t.id[:8]}: {t.status.value} - {idea}
-"
+            response += f"- {t.id[:8]}: {t.status.value} - {idea}\n"
             
         await update.effective_message.reply_text(response)
     except Exception as e:
