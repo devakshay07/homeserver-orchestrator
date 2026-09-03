@@ -9,7 +9,7 @@ from app_logging.setup import setup_logging
 from task_queue.sqlite_queue import SQLiteQueue
 from task_queue.worker import TaskWorker
 from task_queue.models import Task, TaskStatus
-from telegram.bot import build_app
+from tg_bot.bot import build_app
 from scheduler.cron_manager import cron_manager
 
 # Initialize logging before creating loggers

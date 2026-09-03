@@ -8,7 +8,7 @@ from config.settings import settings
 from task_queue.models import Task, TaskStatus, CheckpointKey
 from monitoring.metrics import StageTimer, log_disk_usage
 from task_queue.sqlite_queue import SQLiteQueue
-from telegram.notifier import TelegramNotifier
+from tg_bot.notifier import TelegramNotifier
 
 from gemini.client import GeminiClient, GeminiQuotaExhausted, GeminiContentBlocked
 from gemini.spec_generator import SpecGenerator
