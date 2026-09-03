@@ -88,20 +88,26 @@ async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not update.effective_message:
         return
         
-    tasks = context.bot_data['db_queue'].list_tasks(limit=10)
-    pending_or_progress = [t for t in tasks if t.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.REVIEW, TaskStatus.AWAITING_APPROVAL)]
-    
-    if not pending_or_progress:
-        await update.effective_message.reply_text("The queue is currently empty.")
-        return
+    try:
+        tasks = context.bot_data['db_queue'].list_tasks(limit=10)
+        pending_or_progress = [t for t in tasks if t.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.REVIEW, TaskStatus.AWAITING_APPROVAL)]
         
-    response = "📋 *Current Queue:*\n\n"
+        if not pending_or_progress:
+            await update.effective_message.reply_text("The queue is currently empty.")
+            return
+            
+        response = "📋 Current Queue:
 
-    for t in pending_or_progress:
-        idea = t.payload.get("idea", "Unknown")[:30] + "..."
-        response += f"• `{t.id[:8]}`: {t.status.value} - _{idea}_\n"
-        
-    await update.effective_message.reply_text(response, parse_mode="Markdown")
+"
+        for t in pending_or_progress:
+            idea = t.payload.get("idea", "Unknown")[:30].replace("_", " ").replace("*", " ") + "..."
+            response += f"- {t.id[:8]}: {t.status.value} - {idea}
+"
+            
+        await update.effective_message.reply_text(response)
+    except Exception as e:
+        logger.error(f"Queue command failed: {e}")
+        await update.effective_message.reply_text("Failed to load queue. Check server logs.")
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_message:
