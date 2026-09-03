@@ -10,8 +10,8 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_keys: List[SecretStr]
-    gemini_model_spec: str = "gemini-2.5-flash"
-    gemini_model_review: str = "gemini-2.0-flash"
+    gemini_model_spec: str = "gemini-3.6-flash"
+    gemini_model_review: str = "gemini-3.6-flash"
 
     # GitHub
     github_app_id: Optional[str] = None
