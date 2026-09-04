@@ -36,8 +36,13 @@ async def shutdown(worker, tg_app, sig: signal.Signals | None = None) -> None:
     asyncio.get_running_loop().stop()
 
 def handle_exception(worker, tg_app, loop: asyncio.AbstractEventLoop, context: dict) -> None:
-    msg = context.get("exception", context["message"])
-    logger.error(f"Unhandled exception: {msg}")
+    msg = context.get("exception") or context.get("message", "Unknown error")
+    logger.error(f"Unhandled exception: {msg}", context=str(context))
+    
+    # Don't shut down the entire server just because a background network task hiccupped
+    if isinstance(context.get("exception"), (asyncio.CancelledError, ConnectionError, TimeoutError)):
+        return
+        
     asyncio.create_task(shutdown(worker, tg_app))
 
 async def main() -> None:
