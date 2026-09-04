@@ -14,9 +14,9 @@ class CronManager:
             'default': SQLAlchemyJobStore(url=db_url, tablename='apscheduler_jobs')
         }
         
-        timezone = settings.timezone
+        tz = settings.timezone
             
-        self.scheduler = AsyncIOScheduler(jobstores=jobstores, timezone=str(timezone))
+        self.scheduler = AsyncIOScheduler(jobstores=jobstores, timezone=str(tz))
 
     def start(self):
         if not self.scheduler.running:

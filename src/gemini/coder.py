@@ -109,23 +109,28 @@ Do NOT omit code. Provide the full file content for any updated file.
             
             # Clean potential markdown wrapping
             response_text = response_text.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
+            import re
+            match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response_text)
+            if match:
+                response_text = match.group(1).strip()
                 
-            data = json.loads(response_text)
+            data = json.loads(response_text, strict=False)
             
             # Apply changes
+            safe_root = str(project_dir.resolve())
             for f_data in data.get("files_to_update", []):
-                f_path = project_dir / f_data["path"]
+                f_path = (project_dir / f_data["path"]).resolve()
+                if not str(f_path).startswith(safe_root):
+                    logger.error("Path traversal blocked (write)", path=f_data["path"])
+                    continue
                 f_path.parent.mkdir(parents=True, exist_ok=True)
                 f_path.write_text(f_data["content"])
                 
             for f_path_str in data.get("files_to_delete", []):
-                f_path = project_dir / f_path_str
+                f_path = (project_dir / f_path_str).resolve()
+                if not str(f_path).startswith(safe_root):
+                    logger.error("Path traversal blocked (delete)", path=f_path_str)
+                    continue
                 if f_path.exists():
                     f_path.unlink()
                     

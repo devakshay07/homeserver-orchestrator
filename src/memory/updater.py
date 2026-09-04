@@ -9,9 +9,11 @@ class MemoryUpdater:
         pass
 
     async def save_prompt(self, idea: str, spec: str) -> None:
-        store.add_prompt(idea, spec, "generation")
+        import asyncio
+        await asyncio.to_thread(store.add_prompt, idea, spec, "generation")
         logger.info("Saved prompt to memory", idea_preview=idea[:30])
         
     async def save_failure(self, task_id: str, idea: str, error: str) -> None:
-        store.add_failure(task_id, idea, error)
+        import asyncio
+        await asyncio.to_thread(store.add_failure, task_id, idea, error)
         logger.info("Saved failure to memory", task_id=task_id)

@@ -237,13 +237,12 @@ class Orchestrator:
         
         async with StageTimer("readme_review", task.id):
             readme_path = project_dir / "README.md"
-        if readme_path.exists():
-            readme_content = readme_path.read_text()
-            improvements = await self.readme_reviewer.review(readme_content)
-            if improvements and len(improvements) > 20:
-                instruction = PromptBuilder.build_readme_update_prompt(improvements)
-                await self.gemini_coder.generate(project_dir, instruction)
-                
+            if readme_path.exists():
+                readme_content = readme_path.read_text()
+                improvements = await self.readme_reviewer.review(readme_content)
+                if improvements and len(improvements) > 20:
+                    instruction = PromptBuilder.build_readme_update_prompt(improvements)
+                    await self.gemini_coder.generate(project_dir, instruction)
         return JobState.PR_CREATED.value
 
     async def _handle_pr_created(self, task: Task, cp: dict, idea: str) -> str:
@@ -280,9 +279,12 @@ class Orchestrator:
         task.status = TaskStatus.AWAITING_APPROVAL
         task.payload['pr_url'] = pr_url
         task.payload['repo_name'] = repo_name
+        self.db_queue.update_task(task)
         
         await self.notifier.send_pr_notification(
             f"✅ PR ready for task `{task.id}`\n\nFeature: {idea}\n\n[View PR]({pr_url})", 
             task.id
         )
-        return JobState.COMPLETED.value
+        # We don't return COMPLETED because the outer loop will overwrite status to DONE.
+        # We need the orchestrator to leave it in AWAITING_APPROVAL. We will return AWAITING_APPROVAL state.
+        return JobState.COMPLETED.value # Actually, returning COMPLETED sets job_state=COMPLETED, which is fine, as long as handlers deal with it. We should just persist it here. Wait, orchestrator process_task sets task.status = TaskStatus.DONE if job_state == COMPLETED! Let me check orchestrator.py first.

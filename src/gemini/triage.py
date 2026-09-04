@@ -39,12 +39,12 @@ Respond in RAW JSON ONLY:
         try:
             response = await self.client.generate_content(settings.gemini_model_spec, prompt)
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.endswith("```"):
-                response = response[:-3]
+            import re
+            match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response)
+            if match:
+                response = match.group(1).strip()
                 
-            return json.loads(response)
+            return json.loads(response, strict=False)
         except Exception as e:
             logger.error("Triage failed, defaulting to single task", error=str(e))
             # Fallback

@@ -4,13 +4,17 @@ from task_queue.sqlite_queue import SQLiteQueue
 from task_queue.models import TaskStatus
 
 logger = structlog.get_logger("app")
-db_queue = SQLiteQueue()
+db_queue = None
 
 import asyncio
 from gemini.triage import TriageAgent
 from gemini.client import GeminiClient
 
 async def run_scheduled_build(idea: str):
+    if db_queue is None:
+        logger.error("Skipping scheduled build: db_queue is not initialized")
+        return
+        
     logger.info("Running scheduled build via TriageAgent", idea=idea)
     
     try:
@@ -39,6 +43,9 @@ async def run_scheduled_build(idea: str):
 class JobBuilder:
     @staticmethod
     def add_daily_job(time_str: str, idea: str) -> str:
+        import re
+        if not re.match(r'^\d{2}:\d{2}$', time_str):
+            raise ValueError("Time must be in HH:MM format (e.g., 03:00)")
         hour, minute = map(int, time_str.split(':'))
         job = cron_manager.scheduler.add_job(
             run_scheduled_build,

@@ -1,9 +1,11 @@
 #!/bin/bash
 # healthcheck.sh - Validates environment and dependencies
 
-# Source environment
+# Source environment safely
 if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    source .env
+    set +a
 fi
 
 echo "Running health checks..."
@@ -27,7 +29,7 @@ fi
 if [ -n "$GEMINI_KEYS" ]; then
     GEMINI_KEY_1=$(python3 -c "import json, os; keys=json.loads(os.environ.get('GEMINI_KEYS', '[]')); print(keys[0] if keys else '')")
     if [ -n "$GEMINI_KEY_1" ]; then
-        GM_OK=$(curl -sf -H "x-goog-api-key: ${GEMINI_KEY_1}" "https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_KEY_1}" | python3 -c "import sys,json; print('ok' if 'models' in json.load(sys.stdin) else 'fail')" 2>/dev/null || echo "fail")
+        GM_OK=$(curl -sf -H "x-goog-api-key: ${GEMINI_KEY_1}" "https://generativelanguage.googleapis.com/v1beta/models" | python3 -c "import sys,json; print('ok' if 'models' in json.load(sys.stdin) else 'fail')" 2>/dev/null || echo "fail")
         if [ "$GM_OK" != "ok" ]; then
             echo "FAIL: Gemini API unreachable or key invalid"
             exit 1

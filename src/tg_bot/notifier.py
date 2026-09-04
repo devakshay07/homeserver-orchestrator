@@ -83,7 +83,7 @@ class TelegramNotifier:
         ok = await self._send_with_retry(self.owner_id, text, parse_mode)
         if not ok:
             logger.error("Permanently failed to deliver message, writing to dead letter")
-            self._write_dead_letter({"type": "message", "text": text, "parse_mode": parse_mode})
+            await self._write_dead_letter({"type": "message", "text": text, "parse_mode": parse_mode})
 
     async def send_pr_notification(self, text: str, task_id: str) -> None:
         from .keyboards import get_pr_keyboard
@@ -92,9 +92,12 @@ class TelegramNotifier:
         )
         if not ok:
             logger.error("Failed to deliver PR notification", task_id=task_id)
-            self._write_dead_letter({"type": "pr_notification", "text": text, "task_id": task_id})
+            await self._write_dead_letter({"type": "pr_notification", "text": text, "task_id": task_id})
 
-    def _write_dead_letter(self, payload: dict) -> None:
-        DEAD_LETTER_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(DEAD_LETTER_PATH, "a") as f:
-            f.write(json.dumps({**payload, "ts": datetime.now(timezone.utc).isoformat()}) + "\n")
+    async def _write_dead_letter(self, payload: dict) -> None:
+        def _sync_write():
+            DEAD_LETTER_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(DEAD_LETTER_PATH, "a") as f:
+                f.write(json.dumps({**payload, "ts": datetime.now(timezone.utc).isoformat()}) + "\n")
+        import asyncio
+        await asyncio.to_thread(_sync_write)

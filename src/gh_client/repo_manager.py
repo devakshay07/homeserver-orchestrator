@@ -32,7 +32,9 @@ class RepoManager:
     async def _run_git_raise(self, repo_dir: Path, *args) -> str:
         ok, out = await self._run_git(repo_dir, *args)
         if not ok:
-            raise Exception(f"Git operation failed: git {' '.join(args[:2])} ... -> {out}")
+            cmd_str = ' '.join(args)
+            cmd_str = re.sub(r'bearer\s+[^\s"\'\\]+', 'bearer ***', cmd_str, flags=re.IGNORECASE)
+            raise Exception(f"Git operation failed: git {cmd_str[:50]} ... -> {out}")
         return out
 
     async def init_and_commit(self, repo_dir: Path, branch_name: str, message: str) -> None:
@@ -49,7 +51,8 @@ class RepoManager:
             await self._run_git(repo_dir, "commit", "-m", "Initial commit") # might be nothing to commit
             
         ok, branches = await self._run_git(repo_dir, "branch")
-        if branch_name in branches:
+        branch_list = [b.strip().lstrip("* ") for b in branches.splitlines()]
+        if branch_name in branch_list:
             await self._run_git_raise(repo_dir, "checkout", branch_name)
         else:
             await self._run_git_raise(repo_dir, "checkout", "-b", branch_name)
@@ -65,15 +68,12 @@ class RepoManager:
         else:
             await self._run_git(repo_dir, "remote", "add", "origin", remote_url)
             
-        if token:
-            await self._run_git_raise(repo_dir, "config", "http.extraHeader", f"AUTHORIZATION: bearer {token}")
-            
         try:
-            await self._run_git_raise(repo_dir, "push", "-u", "origin", branch_name)
+            if token:
+                await self._run_git_raise(repo_dir, "-c", f"http.extraHeader=AUTHORIZATION: bearer {token}", "push", "-u", "origin", branch_name)
+            else:
+                await self._run_git_raise(repo_dir, "push", "-u", "origin", branch_name)
             return True
         except Exception as e:
             logger.error("Push failed", error=str(e))
             return False
-        finally:
-            if token:
-                await self._run_git(repo_dir, "config", "--unset", "http.extraHeader")

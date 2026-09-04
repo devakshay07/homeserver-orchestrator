@@ -3,7 +3,6 @@ import structlog
 
 from config.settings import settings
 from .handlers import register_handlers
-from .middleware import OwnerOnlyMiddleware
 from .notifier import TelegramNotifier
 
 logger = structlog.get_logger("telegram")

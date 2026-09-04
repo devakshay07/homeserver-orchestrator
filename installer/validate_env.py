@@ -6,7 +6,7 @@ try:
     from config.settings import settings
     
     # Check essential variables
-    if not settings.telegram_token:
+    if not settings.telegram_token or not settings.telegram_token.get_secret_value().strip():
         print("Missing TELEGRAM_TOKEN")
         sys.exit(1)
         
@@ -16,6 +16,10 @@ try:
         
     if not settings.github_app_id and not settings.github_pat:
         print("Missing GitHub authentication (App ID or PAT)")
+        sys.exit(1)
+        
+    if settings.github_app_id and not settings.github_app_private_key_path:
+        print("Missing GitHub App private key path")
         sys.exit(1)
         
     print("Environment variables validated successfully.")

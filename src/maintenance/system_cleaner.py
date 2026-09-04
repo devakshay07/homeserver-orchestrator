@@ -47,14 +47,15 @@ class SystemCleaner:
                 
     def _clean_old_workspaces(self) -> int:
         count = 0
-        now = datetime.now()
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
         max_age = timedelta(days=settings.workspace_max_age_days)
         if not self.workspace_dir.exists():
             return count
             
         for p in self.workspace_dir.iterdir():
             if p.is_dir():
-                mtime = datetime.fromtimestamp(p.stat().st_mtime)
+                mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
                 if now - mtime > max_age:
                     try:
                         shutil.rmtree(p)
@@ -76,24 +77,27 @@ class SystemCleaner:
 
     def _clean_pycache(self) -> int:
         count = 0
-        for root, dirs, files in os.walk(".", topdown=False):
+        src_dir = Path(__file__).parent.parent
+        for root, dirs, files in os.walk(src_dir, topdown=False):
             for name in dirs:
                 if name == "__pycache__":
                     try:
                         shutil.rmtree(os.path.join(root, name))
                         count += 1
-                    except: pass
+                    except Exception as e:
+                        logger.warning("Failed to delete pycache", path=os.path.join(root, name), error=str(e))
         return count
 
     def _clean_old_logs(self) -> int:
         count = 0
-        now = datetime.now()
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
         logs_dir = self.data_dir / "logs"
         if not logs_dir.exists():
             return count
             
         for f in logs_dir.glob("*.log"):
-            mtime = datetime.fromtimestamp(f.stat().st_mtime)
+            mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
             if now - mtime > timedelta(days=7):
                 try:
                     f.unlink()

@@ -93,29 +93,6 @@ RUN pip install --no-cache-dir -r requirements.txt
             report.stages.append(StageResult(name="Sandbox Build", passed=False, policy=GatePolicy.BLOCK))
             return report
 
-        pip_path = str(venv_dir / "bin" / "pip")
-        
-        req_file = project_dir / "requirements.txt"
-        if req_file.exists():
-            import asyncio
-            logger.info("Installing dependencies for generated project")
-            proc = await asyncio.create_subprocess_exec(
-                pip_path, "install", "-r", "requirements.txt",
-                cwd=str(project_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            await proc.communicate()
-            
-        import asyncio
-        proc = await asyncio.create_subprocess_exec(
-            pip_path, "install", "pytest", "mypy", "ruff", "detect-secrets",
-            cwd=str(project_dir),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        await proc.communicate()
-
         report = GateReport()
         runners = [
             self.linter.run_format,

@@ -7,7 +7,7 @@ logger = structlog.get_logger("app")
 
 class MemoryStore:
     def __init__(self):
-        self.db_path = Path("data/memory.sqlite")
+        self.db_path = Path(str(settings.db_path).replace('.sqlite', '_memory.sqlite'))
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         logger.info("Memory store initialized (SQLite FTS5)")

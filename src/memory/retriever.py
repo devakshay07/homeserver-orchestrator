@@ -8,4 +8,5 @@ class Retriever:
         pass
 
     async def search_prompts(self, query: str, n_results: int = 3) -> list[str]:
-        return store.search_prompts(query, limit=n_results)
+        import asyncio
+        return await asyncio.to_thread(store.search_prompts, query, limit=n_results)

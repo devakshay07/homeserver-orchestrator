@@ -27,8 +27,6 @@ class SpecGenerator:
             
         system_instruction = (
             "You are an expert Systems Architect. You must generate an extremely detailed "
-
-            "You are an expert Systems Architect. You must generate an extremely detailed "
             "software specification based on the user's idea and the provided project generation rules.\n"
             "Do NOT write any actual code. Instead, write a comprehensive markdown document that will be "
             "passed as instructions to an autonomous coding agent.\n\n"

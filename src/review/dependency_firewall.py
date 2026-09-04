@@ -41,12 +41,13 @@ Respond in RAW JSON ONLY:
         try:
             response = await self.client.generate_content(settings.gemini_model_spec, prompt)
             response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.endswith("```"):
-                response = response[:-3]
+            
+            import re
+            match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response)
+            if match:
+                response = match.group(1).strip()
                 
-            data = json.loads(response)
+            data = json.loads(response, strict=False)
             
             if not data.get("safe", False):
                 logger.warning("Dependency firewall blocked packages", reason=data.get("reason"))
@@ -57,9 +58,23 @@ Respond in RAW JSON ONLY:
             return True
             
         except Exception as e:
-            logger.error("Dependency firewall failed", error=str(e))
-            # Fail closed? For now, we sanitize by returning True but log heavily, or fail open?
-            # A strict firewall should fail closed. 
-            # We'll rewrite it to empty if we crash to be safe, but that breaks the build.
+            logger.error("Dependency firewall API failed, falling back to local allowed_list", error=str(e))
+            # Local fallback: check if all requirements are in allowed_list
+            lines = content.splitlines()
+            safe_lines = []
+            all_safe = True
+            for line in lines:
+                pkg = line.split("==")[0].strip().lower()
+                if not pkg or pkg.startswith("#"):
+                    continue
+                if pkg in self.allowed_list:
+                    safe_lines.append(line)
+                else:
+                    logger.warning("Local firewall blocked unknown package", package=pkg)
+                    all_safe = False
+                    
+            if not all_safe:
+                req_file.write_text("\n".join(safe_lines))
+                return False
             return True
 

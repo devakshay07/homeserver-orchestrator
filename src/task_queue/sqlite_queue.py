@@ -15,7 +15,7 @@ class SQLiteQueue:
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
+        conn = sqlite3.connect(self.db_path, timeout=30.0, isolation_level="IMMEDIATE")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         return conn
@@ -71,31 +71,24 @@ class SQLiteQueue:
     def dequeue(self) -> Optional[Task]:
         now = datetime.now(timezone.utc).isoformat()
         with self._get_conn() as conn:
-            conn.execute("BEGIN IMMEDIATE")
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority
-                FROM tasks
-                WHERE status = ? AND attempts < ?
-                ORDER BY priority DESC, created_at ASC
-                LIMIT 1
-            """, (TaskStatus.PENDING.value, settings.max_retries))
+                UPDATE tasks
+                SET status = ?, updated_at = ?, attempts = attempts + 1
+                WHERE id = (
+                    SELECT id FROM tasks 
+                    WHERE status = ? AND attempts < ?
+                    ORDER BY priority DESC, created_at ASC
+                    LIMIT 1
+                )
+                RETURNING id, status, payload_json, created_at, updated_at, attempts, checkpoint_json, priority
+            """, (TaskStatus.IN_PROGRESS.value, now, TaskStatus.PENDING.value, settings.max_retries))
             row = cursor.fetchone()
             
             if not row:
-                conn.rollback()
                 return None
                 
             task = Task.from_row(row)
-            task.status = TaskStatus.IN_PROGRESS
-            task.updated_at = datetime.fromisoformat(now)
-            task.attempts += 1
-            
-            cursor.execute("""
-                UPDATE tasks
-                SET status = ?, updated_at = ?, attempts = ?
-                WHERE id = ?
-            """, (task.status.value, task.updated_at.isoformat(), task.attempts, task.id))
             conn.commit()
             return task
 

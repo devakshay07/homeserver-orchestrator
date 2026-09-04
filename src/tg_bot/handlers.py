@@ -177,7 +177,9 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         if repo_name and pr_number:
             try:
                 await pr_manager.close_pr(repo_name, pr_number)
-            except: pass
+            except Exception as e:
+                import structlog
+                structlog.get_logger("handlers").warning("PR close failed (reject)", error=str(e), repo=repo_name, pr=pr_number)
         task.status = TaskStatus.REJECTED
         context.bot_data['db_queue'].update_task(task)
         await query.edit_message_text(f"{query.message.text}\n\n❌ Task {task_id} REJECTED.")
@@ -186,7 +188,9 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         if repo_name and pr_number:
             try:
                 await pr_manager.close_pr(repo_name, pr_number)
-            except: pass
+            except Exception as e:
+                import structlog
+                structlog.get_logger("handlers").warning("PR close failed (regenerate)", error=str(e), repo=repo_name, pr=pr_number)
         task.status = TaskStatus.PENDING
         task.attempts = 0
         context.bot_data['db_queue'].update_task(task)
@@ -304,7 +308,9 @@ async def reject_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         pr_manager = PRManager()
         try:
             await pr_manager.close_pr(repo_name, pr_number)
-        except: pass
+        except Exception as e:
+            import structlog
+            structlog.get_logger("handlers").warning("PR close failed (/reject)", error=str(e), repo=repo_name, pr=pr_number)
         
     task.status = TaskStatus.REJECTED
     context.bot_data['db_queue'].update_task(task)
@@ -333,7 +339,9 @@ async def regenerate_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         pr_manager = PRManager()
         try:
             await pr_manager.close_pr(repo_name, pr_number)
-        except: pass
+        except Exception as e:
+            import structlog
+            structlog.get_logger("handlers").warning("PR close failed (/regenerate)", error=str(e), repo=repo_name, pr=pr_number)
         
     task.status = TaskStatus.PENDING
     task.attempts = 0
@@ -346,7 +354,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Mask secrets
     safe_settings = {
         "OWNER_TELEGRAM_ID": settings.owner_telegram_id,
-        "GEMINI_KEYS_COUNT": len(settings.keys) if hasattr(settings, 'keys') else len(settings.gemini_keys),
+        "GEMINI_KEYS_COUNT": len(settings.gemini_keys),
         "GITHUB_APP_ID": settings.github_app_id,
         "GITHUB_OWNER": settings.github_owner,
         "TIMEZONE": settings.timezone,
@@ -379,12 +387,18 @@ async def pending_notifications_command(update, context):
     
     notifier = context.bot_data['notifier']
     
-    for line in lines:
-        payload = json.loads(line)
-        if payload.get("type") == "message":
-            await notifier.send_message(payload.get("text"), payload.get("parse_mode", "Markdown"))
-        elif payload.get("type") == "pr_notification":
-            await notifier.send_pr_notification(payload.get("text"), payload.get("task_id"))
+    try:
+        for i, line in enumerate(lines):
+            payload = json.loads(line)
+            if payload.get("type") == "message":
+                await notifier.send_message(payload.get("text"), payload.get("parse_mode", "Markdown"))
+            elif payload.get("type") == "pr_notification":
+                await notifier.send_pr_notification(payload.get("text"), payload.get("task_id"))
+    except Exception:
+        with open(DEAD_LETTER_PATH, "a") as f:
+            for remaining_line in lines[i:]:
+                f.write(remaining_line)
+        raise
 
 
 async def stats_command(update, context):

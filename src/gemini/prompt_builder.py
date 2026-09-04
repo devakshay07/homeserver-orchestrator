@@ -7,7 +7,9 @@ class PromptBuilder:
         Generate all source files, configurations, documentation, and tests.
 
         # Specification:
+        <spec>
         {spec}
+        </spec>
         """
         
     @staticmethod
@@ -16,5 +18,7 @@ class PromptBuilder:
         Please update the README.md based on the following review feedback.
         
         # Feedback:
+        <feedback>
         {improvements}
+        </feedback>
         """
