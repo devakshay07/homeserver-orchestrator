@@ -16,6 +16,14 @@ class SystemCleaner:
         self.workspace_dir = Path(settings.workspace_dir)
         self.notifier = notifier
 
+    @staticmethod
+    async def run_standalone_maintenance():
+        # Re-initialize locally when the job executes to avoid pickling live objects
+        # We pass None for notifier here; if notifications are needed, the orchestrator
+        # or bot must hook into this separately, or we retrieve it from a global registry.
+        cleaner = SystemCleaner(notifier=None)
+        await cleaner.run_nightly_maintenance()
+
     async def run_nightly_maintenance(self):
         logger.info("Starting nightly system maintenance...")
         report = []

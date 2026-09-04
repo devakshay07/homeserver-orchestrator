@@ -32,9 +32,11 @@ def main() -> None:
         cron_manager.start()
         
         # Schedule Nightly Maintenance
-        cleaner = SystemCleaner(notifier)
+        # We must use a standalone function here, not a bound method of `cleaner`.
+        # APScheduler cannot pickle bound methods of objects containing unpicklable state
+        # (like the `notifier` which contains the Telegram Bot instance).
         cron_manager.scheduler.add_job(
-            cleaner.run_nightly_maintenance,
+            SystemCleaner.run_standalone_maintenance,
             'cron',
             hour=3,
             minute=0,
