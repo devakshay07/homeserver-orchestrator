@@ -63,13 +63,8 @@ class Orchestrator:
         status_lines = [f"🚀 **Job:** _{idea[:50]}_", ""]
         
         states = [
-            (JobState.PLANNING.value, "🧠 Planning"),
-            (JobState.TEST_GENERATING.value, "🧪 Writing Tests"),
+            (JobState.PLANNING.value, "🧠 Planning (Architecture & Spec)"),
             (JobState.CODE_GENERATING.value, "⚙️ Generating Code"),
-            (JobState.FIREWALL.value, "🛡️ SecOps Firewall"),
-            (JobState.TESTING.value, "🔍 Running QA Gate"),
-            (JobState.DEBUGGING.value, "🐛 Debugging"),
-            (JobState.REVIEW.value, "📝 Reviewing Docs"),
             (JobState.PR_CREATED.value, "🐙 PR Created")
         ]
         
@@ -170,7 +165,7 @@ class Orchestrator:
             cp[CheckpointKey.SPEC_TEXT] = spec
             cp[CheckpointKey.REPO_NAME] = repo_name
             cp[CheckpointKey.PROJECT_DIR] = project_dir
-        return JobState.TEST_GENERATING.value
+        return JobState.CODE_GENERATING.value
 
     async def _handle_test_generating(self, task: Task, cp: dict) -> str:
         project_dir = Path(cp[CheckpointKey.PROJECT_DIR])
@@ -189,12 +184,12 @@ class Orchestrator:
         spec = cp[CheckpointKey.SPEC_TEXT]
         
         async with StageTimer("code_generation", task.id):
-            instruction = f"Based on the `task.md` checklist and the failing tests in `tests/`, write the actual source code and requirements.txt to fulfill the spec:\n\n{spec}"
+            instruction = f"Write the COMPLETE source code, project structure, and requirements.txt to fulfill this spec:\n\n{spec}"
             ret_code, stdout, stderr = await self.gemini_coder.generate(project_dir, instruction)
             if ret_code != 0:
                 raise Exception(f"Code Generation failed: {stderr}")
                 
-        return JobState.FIREWALL.value
+        return JobState.PR_CREATED.value
 
     async def _handle_firewall(self, task: Task, cp: dict) -> str:
         project_dir = Path(cp[CheckpointKey.PROJECT_DIR])
