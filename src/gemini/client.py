@@ -76,6 +76,9 @@ class GeminiClient:
                     if "blocked" in error_msg or "safety" in error_msg:
                         raise GeminiContentBlocked(f"Content blocked by safety filters: {error_msg}")
                     
+                    if "404" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
+                        break  # model is deprecated or doesn't exist, try next model immediately
+                    
                     if "429" in error_msg or "quota" in error_msg:
                         keys_tried.add(key_idx)
                         if len(keys_tried) >= len(self.keys):
