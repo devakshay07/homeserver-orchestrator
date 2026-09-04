@@ -10,8 +10,11 @@ logger = structlog.get_logger("telegram")
 from telegram import Update
 from telegram.ext import ApplicationHandlerStop, TypeHandler
 
-def build_app():
-    app = ApplicationBuilder().token(settings.telegram_token.get_secret_value()).build()
+def build_app(post_init=None):
+    builder = ApplicationBuilder().token(settings.telegram_token.get_secret_value())
+    if post_init:
+        builder = builder.post_init(post_init)
+    app = builder.build()
     
     async def middleware_callback(update: Update, context):
         user_id = update.effective_user.id if update.effective_user else None
