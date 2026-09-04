@@ -82,7 +82,9 @@ class GeminiClient:
                     if "429" in error_msg or "quota" in error_msg:
                         keys_tried.add(key_idx)
                         if len(keys_tried) >= len(self.keys):
-                            break  # all keys exhausted -> try next model
+                            logger.info("All keys hit rate limit, waiting before retry", backoff=backoff)
+                            keys_tried.clear() # Clear so we can retry after sleeping
+                            # DO NOT break here. Let it fall through to the sleep below.
                     
                     await asyncio.sleep(backoff)
                     backoff = min(backoff * 2, 60)
